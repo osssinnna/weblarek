@@ -3,12 +3,10 @@ import { apiProducts } from "./utils/data";
 import { ProductsModel } from "./components/models/ProductsModel";
 import { CartModel } from "./components/models/CartModel";
 import { BuyerModel } from "./components/models/BuyerModel";
-import { Api } from "./components/base/Api";
 import { API_URL } from "./utils/constants";
 import { WebLarekApi } from "./components/WebLarekApi";
 
-const http = new Api(API_URL);
-const webLarekApi = new WebLarekApi(http);
+const webLarekApi = new WebLarekApi(API_URL);
 const productsModel = new ProductsModel();
 
 //Проверка для каталога
