@@ -270,23 +270,11 @@ export interface IOrderResult {
 
 ## Слой Представления (View)
 
-> Каждый класс представления отвечает за свой блок разметки, находит элементы **в конструкторе** и сохраняет ссылки в полях.  
-> Слушатели вешаются один раз. Представления **не содержат бизнес-логики** и **не хранят данные**.
-
-### Базовый класс: `Component<T>`
-
-- **Назначение:** общий базовый класс для всех компонентов UI.
-- **Конструктор:** `constructor(container: HTMLElement)`
-- **Поля:**
-  - `protected container: HTMLElement`
-- **Методы:**
-  - `render(data?: Partial<T>): HTMLElement` — применяет входные данные через сеттеры и возвращает `container`.
-
----
+Каждый класс представления отвечает за свой блок разметки, находит элементы в конструкторе и сохраняет ссылки в полях.
 
 ### Модальное окно: `Modal`
 
-> Модальное окно **не имеет дочерних классов**. Внутри отображаются самостоятельные компоненты.
+Модальное окно **не имеет дочерних классов**. Внутри отображаются самостоятельные компоненты.
 
 - **Конструктор:** `constructor(container: HTMLElement)`
 - **Поля:**
@@ -296,8 +284,6 @@ export interface IOrderResult {
   - `open(content?: HTMLElement): void` — вставляет контент и добавляет модификатор `modal_active` элементу `.modal`. Блокирует скролл страницы.
   - `close(): void` — снимает `modal_active`. Возвращает скролл страницы.
   - `set content(value: HTMLElement | null)` — замена содержимого `.modal__content`.
-
----
 
 ### Шапка: `Header`
 
@@ -310,8 +296,6 @@ export interface IOrderResult {
 - **События (emit):**
   - `basket:open` — при клике по иконке корзины.
 
----
-
 ### Галерея каталога: `Gallery`
 
 - **Конструктор:** `constructor(container: HTMLElement)`
@@ -319,8 +303,6 @@ export interface IOrderResult {
   - `protected catalogElement: HTMLElement` — равен самому контейнеру `.gallery`.
 - **Методы:**
   - `render(data: { catalog: HTMLElement[] }): HTMLElement` — заменяет детей контейнера; каждому элементу гарантируется класс `.gallery__item`.
-
----
 
 ### Базовая карточка: `Card<T extends object = {}>`
 
@@ -335,8 +317,6 @@ export interface IOrderResult {
   - `set price(value: number | null)` — цена или «Бесценно».
 - **Особенность:** клик по **внутренней** кнопке не триггерит `onClick` карточки.
 
----
-
 ### Карточка в каталоге: `CardCatalog extends Card`
 
 - **Конструктор:** `constructor(container: HTMLElement, actions?: { onClick?: () => void })`
@@ -346,8 +326,6 @@ export interface IOrderResult {
 - **Методы/сеттеры:**
   - `render(data: { title: string; price: number | null; image: string; category: string }): HTMLElement`
   - применяет модификаторы элемента `.card__category` по `categoryMap` (см. `src/utils/constants.ts`).
-
----
 
 ### Карточка превью (в модалке): `CardPreview extends Card`
 
@@ -360,8 +338,6 @@ export interface IOrderResult {
   - `render(data: { title: string; price: number | null; image: string; description: string; inCart: boolean }): HTMLElement`
   - если `price === null` — `actionButton.disabled = true`, текст «Недоступно»; иначе текст «Купить»/«Удалить из корзины» по `inCart`.
 
----
-
 ### Карточка в корзине (строка): `CardInCart extends Card`
 
 - **Конструктор:** `constructor(container: HTMLElement, actions?: { onRemove?: () => void })`
@@ -370,8 +346,6 @@ export interface IOrderResult {
   - `protected removeButton: HTMLButtonElement` — `.basket__item-delete`
 - **Методы/сеттеры:**
   - `render(data: { index: number; title: string; price: number | null }): HTMLElement`
-
----
 
 ### Корзина(модальное окно): `BasketView`
 
@@ -386,8 +360,6 @@ export interface IOrderResult {
 - **События (emit через коллбэк):**
   - `basket:checkout` — при клике по кнопке «Оформить».
 
----
-
 ### Базовая форма: `BaseForm<T extends object = {}>`
 
 - **Конструктор:**  
@@ -400,8 +372,6 @@ export interface IOrderResult {
   - `set valid(value: boolean)` — включает/выключает кнопку submit.
   - `set errors(map: Record<string,string>)` — выводит агрегированное сообщение об ошибках.
 
----
-
 ### Первая форма обработки ошибок: `OrderStep1Form extends BaseForm<{ payment: 'card'|'cash'|''; address: string }>`
 
 - **Конструктор:**  
@@ -411,8 +381,6 @@ export interface IOrderResult {
   - поле адреса — `input[name="address"]`
 - **Методы/сеттеры:**
   - `render(data: { payment: 'card'|'cash'|''; address: string; valid: boolean; errors: Record<string,string> }): HTMLElement`
-
----
 
 ### Вторая форма обработки ошибок: `OrderStep2Form extends BaseForm<{ email: string; phone: string }>`
 
@@ -424,8 +392,6 @@ export interface IOrderResult {
 - **Методы/сеттеры:**
   - `render(data: { email: string; phone: string; valid: boolean; errors: Record<string,string> }): HTMLElement`
 
----
-
 ### Модалбное окно «Заказ оформлен»: `OrderSuccess`
 
 - **Конструктор:** `constructor(container: HTMLElement, onClose: () => void)`
@@ -435,11 +401,9 @@ export interface IOrderResult {
 - **Методы/сеттеры:**
   - `render(data: { total: number }): HTMLElement` — выставляет текст «Списано N синапсов».
 
----
-
 ## События, генерируемые Представлениями
 
-> Имена событий перечислены в `src/components/base/eventNames.ts`.
+Имена событий перечислены в `src/components/base/eventNames.ts`.
 
 - `basket:open` — клик по корзине в шапке (`Header`)
 - `card:select` — выбор карточки в каталоге (`CardCatalog`)
