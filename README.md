@@ -239,11 +239,11 @@ export interface IOrderResult {
 
 **Валидация:**
 
-- `validateStep1(): { payment?: string; address?: string }`
+- `validateAddressPayment(): { payment?: string; address?: string }`
   **Правила:**
   - `payment` — должен быть `'card' | 'cash'`;
   - `address` — непустая строка.
-- `validateStep2(): { email?: string; phone?: string }`
+- `validateEmailPhone(): { email?: string; phone?: string }`
   **Правила:**
   - `email` — непустая строка;
   - `phone` — непустая строка.
@@ -372,7 +372,7 @@ export interface IOrderResult {
   - `set valid(value: boolean)` — включает/выключает кнопку submit.
   - `set errors(map: Record<string,string>)` — выводит агрегированное сообщение об ошибках.
 
-### Первая форма обработки ошибок: `OrderStep1Form extends BaseForm<{ payment: 'card'|'cash'|''; address: string }>`
+### Первая форма обработки ошибок: `OrderAddressPaymentForm extends BaseForm<{ payment: 'card'|'cash'|''; address: string }>`
 
 - **Конструктор:**  
   `constructor(container: HTMLFormElement, onSubmit: () => void, onChange: (data: Partial<{ payment: 'card'|'cash'|''; address: string }>) => void)`
@@ -382,7 +382,7 @@ export interface IOrderResult {
 - **Методы/сеттеры:**
   - `render(data: { payment: 'card'|'cash'|''; address: string; valid: boolean; errors: Record<string,string> }): HTMLElement`
 
-### Вторая форма обработки ошибок: `OrderStep2Form extends BaseForm<{ email: string; phone: string }>`
+### Вторая форма обработки ошибок: `OrderEmailPhoneForm extends BaseForm<{ email: string; phone: string }>`
 
 - **Конструктор:**  
   `constructor(container: HTMLFormElement, onSubmit: () => void, onChange: (data: Partial<{ email: string; phone: string }>) => void)`
@@ -410,5 +410,5 @@ export interface IOrderResult {
 - `card:buy` — клик «Купить» в превью (`CardPreview`)
 - `card:remove` — клик «Удалить из корзины» в превью или в строке корзины (`CardPreview`, `CardInCart`)
 - `basket:checkout` — клик «Оформить» в корзине (`BasketView`)
-- `order:step1:next` — сабмит формы шага 1 (`OrderStep1Form`)
-- `order:step2:pay` — сабмит формы шага 2 (`OrderStep2Form`)
+- `order:addresspayment:next` — сабмит формы шага 1 (`OrderAddressPaymentForm`)
+- `order:emailphone:pay` — сабмит формы шага 2 (`OrderEmailPhoneForm`)

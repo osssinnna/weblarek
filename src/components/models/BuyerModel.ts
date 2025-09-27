@@ -2,8 +2,8 @@ import type { TPayment } from "../../types";
 import type { IEvents } from "../base/Events";
 import { EVENTS } from "../base/eventNames";
 
-type Step1Errors = { payment?: string; address?: string };
-type Step2Errors = { email?: string; phone?: string };
+type AddressPaymentErrors = { payment?: string; address?: string };
+type EmailPhoneErrors = { email?: string; phone?: string };
 
 export class BuyerModel {
   private payment?: TPayment;
@@ -53,16 +53,16 @@ export class BuyerModel {
     this.events?.emit(EVENTS.BUYER_CHANGED, {});
   }
 
-  public validateStep1(): Step1Errors {
-    const errors: Step1Errors = {};
+  public validateAddressPayment(): AddressPaymentErrors {
+    const errors: AddressPaymentErrors = {};
     if (!this.payment) errors.payment = "Выберите способ оплаты";
     if (!this.address || !this.address.trim())
       errors.address = "Необходимо указать адрес";
     return errors;
   }
 
-  public validateStep2(): Step2Errors {
-    const errors: Step2Errors = {};
+  public validateEmailPhone(): EmailPhoneErrors {
+    const errors: EmailPhoneErrors = {};
     if (!this.email || !this.email.trim()) errors.email = "Укажите email";
     if (!this.phone || !this.phone.trim()) errors.phone = "Укажите телефон";
     return errors;

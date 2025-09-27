@@ -18,8 +18,8 @@ import { CardPreview } from "./components/views/CardPreview";
 import { CardInCart } from "./components/views/CardInCart";
 import { BasketView } from "./components/views/BasketView";
 import { Modal } from "./components/views/Modal";
-import { OrderStep1Form } from "./components/views/forms/OrderStep1Form";
-import { OrderStep2Form } from "./components/views/forms/OrderStep2Form";
+import { OrderAddressPaymentForm } from "./components/views/forms/OrderAddressPaymentForm";
+import { OrderEmailPhoneForm } from "./components/views/forms/OrderEmailPhoneForm";
 import { OrderSuccess } from "./components/views/OrderSuccess";
 
 import type { IProduct, IOrderPayload } from "./types";
@@ -38,9 +38,54 @@ const tplCardCatalog = ensureElement<HTMLTemplateElement>("#card-catalog");
 const tplCardPreview = ensureElement<HTMLTemplateElement>("#card-preview");
 const tplBasket = ensureElement<HTMLTemplateElement>("#basket");
 const tplBasketItem = ensureElement<HTMLTemplateElement>("#card-basket");
-const tplOrderStep1 = ensureElement<HTMLTemplateElement>("#order");
-const tplOrderStep2 = ensureElement<HTMLTemplateElement>("#contacts");
+const tplOrderAddressPayment = ensureElement<HTMLTemplateElement>("#order");
+const tplOrderEmailPhone = ensureElement<HTMLTemplateElement>("#contacts");
 const tplSuccess = ensureElement<HTMLTemplateElement>("#success");
+
+function updateAddressPaymentValidity() {
+  orderAddressPaymentForm.render({
+    valid: isAddressPaymentValid(),
+    errors: buyer.validateAddressPayment(),
+  });
+}
+
+function updateEmailPhoneValidity() {
+  orderEmailPhoneForm.render({
+    valid: isEmailPhoneValid(),
+    errors: buyer.validateEmailPhone(),
+  });
+}
+
+const basketView = new BasketView(cloneTemplate(tplBasket), () =>
+  events.emit(EVENTS.BASKET_CHECKOUT)
+);
+
+const orderAddressPaymentForm = new OrderAddressPaymentForm(
+  cloneTemplate(tplOrderAddressPayment),
+  () => events.emit(EVENTS.ORDER_ADDRESS_PAYMENT_NEXT),
+  (data) => {
+    if ("address" in data) buyer.setAddress(data.address || "");
+    if ("payment" in data) buyer.setPayment((data.payment || "") as any);
+    updateAddressPaymentValidity();
+  }
+);
+
+const orderEmailPhoneForm = new OrderEmailPhoneForm(
+  cloneTemplate(tplOrderEmailPhone),
+  () => events.emit(EVENTS.ORDER_EMAIL_PHONE_PAY),
+  (data) => {
+    if ("email" in data) buyer.setEmail(data.email || "");
+    if ("phone" in data) buyer.setPhone(data.phone || "");
+    updateEmailPhoneValidity();
+  }
+);
+
+const orderSuccessView = new OrderSuccess(cloneTemplate(tplSuccess), () =>
+  modal.close()
+);
+
+let basketRowsCache: HTMLElement[] = [];
+let basketTotalCache = 0;
 
 const rerenderHeader = () => header.render({ counter: cart.getCount() });
 
@@ -66,7 +111,11 @@ function openPreview() {
 
   const view = new CardPreview(cloneTemplate(tplCardPreview), {
     onBuy: () => events.emit(EVENTS.CARD_BUY, { id: item.id }),
-    onRemove: () => events.emit(EVENTS.CARD_REMOVE, { id: item.id }),
+    onRemove: () =>
+      events.emit(EVENTS.CARD_REMOVE, {
+        id: item.id,
+        from: "preview" as const,
+      }),
   });
 
   modal.open(
@@ -81,74 +130,37 @@ function openPreview() {
 }
 
 function openBasket() {
-  const rows: HTMLElement[] = cart.getItems().map((p, idx) => {
-    const row = new CardInCart(cloneTemplate(tplBasketItem), {
-      onRemove: () => events.emit(EVENTS.CARD_REMOVE, { id: p.id }),
-    });
-    return row.render({
-      index: idx + 1,
-      title: p.title,
-      price: p.price,
-    });
-  });
-
-  const basket = new BasketView(cloneTemplate(tplBasket), () =>
-    events.emit(EVENTS.BASKET_CHECKOUT)
-  );
-
   modal.open(
-    basket.render({
-      items: rows,
-      total: cart.getTotal(),
-      empty: rows.length === 0,
+    basketView.render({
+      items: basketRowsCache,
+      total: basketTotalCache,
+      empty: basketRowsCache.length === 0,
     })
   );
 }
 
-function openOrderStep1() {
-  const form = new OrderStep1Form(
-    cloneTemplate(tplOrderStep1),
-    () => events.emit(EVENTS.ORDER_STEP1_NEXT),
-    (data) => {
-      if ("address" in data) buyer.setAddress(data.address || "");
-      if ("payment" in data) buyer.setPayment((data.payment || "") as any);
-      updateStep1Validity(form);
-    }
-  );
-
-  form.render({
+function openOrderAddressPayment() {
+  orderAddressPaymentForm.render({
     address: buyer.getAddress() || "",
     payment: (buyer.getPayment() || "") as any,
-    valid: isStep1Valid(),
+    valid: isAddressPaymentValid(),
     errors: {},
   });
-
-  modal.open(form.render());
+  modal.open(orderAddressPaymentForm.render());
 }
 
-function openOrderStep2() {
-  const form = new OrderStep2Form(
-    cloneTemplate(tplOrderStep2),
-    () => events.emit(EVENTS.ORDER_STEP2_PAY),
-    (data) => {
-      if ("email" in data) buyer.setEmail(data.email || "");
-      if ("phone" in data) buyer.setPhone(data.phone || "");
-      updateStep2Validity(form);
-    }
-  );
-
-  form.render({
+function openOrderEmailPhone() {
+  orderEmailPhoneForm.render({
     email: buyer.getEmail() || "",
     phone: buyer.getPhone() || "",
-    valid: isStep2Valid(),
+    valid: isEmailPhoneValid(),
     errors: {},
   });
-
-  modal.open(form.render());
+  modal.open(orderEmailPhoneForm.render());
 }
 
 function handlePay() {
-  if (!isStep2Valid()) return;
+  if (!isEmailPhoneValid()) return;
 
   const payload: IOrderPayload = {
     items: cart.getItems().map((i) => i.id),
@@ -165,46 +177,47 @@ function handlePay() {
       cart.clear();
       buyer.reset();
 
-      const view = new OrderSuccess(cloneTemplate(tplSuccess), () =>
-        modal.close()
-      );
-
-      modal.open(view.render({ total: res.total }));
+      modal.open(orderSuccessView.render({ total: res.total }));
     })
     .catch((e) => {
       console.error("Ошибка оформления заказа:", e);
     });
 }
 
-//валидация
-
-const isStep1Valid = () => Object.keys(buyer.validateStep1()).length === 0;
-const isStep2Valid = () => Object.keys(buyer.validateStep2()).length === 0;
-
-function updateStep1Validity(form: OrderStep1Form) {
-  form.render({ valid: isStep1Valid(), errors: buyer.validateStep1() });
-}
-
-function updateStep2Validity(form: OrderStep2Form) {
-  form.render({ valid: isStep2Valid(), errors: buyer.validateStep2() });
-}
+const isAddressPaymentValid = () =>
+  Object.keys(buyer.validateAddressPayment()).length === 0;
+const isEmailPhoneValid = () =>
+  Object.keys(buyer.validateEmailPhone()).length === 0;
 
 // modal
 
 events.on(EVENTS.CATALOG_CHANGED, () => rerenderCatalog());
 events.on(EVENTS.CART_CHANGED, () => {
   rerenderHeader();
-  const isBasketOpenNow = !!document.querySelector(
-    ".modal.modal_active .basket"
-  );
-  if (isBasketOpenNow) openBasket();
+  basketRowsCache = cart.getItems().map((p, idx) => {
+    const row = new CardInCart(cloneTemplate(tplBasketItem), {
+      onRemove: () =>
+        events.emit(EVENTS.CARD_REMOVE, { id: p.id, from: "basket" as const }),
+    });
+    return row.render({
+      index: idx + 1,
+      title: p.title,
+      price: p.price,
+    });
+  });
+  basketTotalCache = cart.getTotal();
+  basketView.render({
+    items: basketRowsCache,
+    total: basketTotalCache,
+    empty: basketRowsCache.length === 0,
+  });
 });
 
 events.on(EVENTS.SELECT_CHANGED, () => openPreview());
 
 // view
 events.on(EVENTS.BASKET_OPEN, () => openBasket());
-events.on(EVENTS.BASKET_CHECKOUT, () => openOrderStep1());
+events.on(EVENTS.BASKET_CHECKOUT, () => openOrderAddressPayment());
 
 events.on<{ id: string }>(EVENTS.CARD_SELECT, ({ id }) => {
   products.setSelectedProduct(id);
@@ -218,19 +231,21 @@ events.on<{ id: string }>(EVENTS.CARD_BUY, ({ id }) => {
   }
 });
 
-events.on<{ id: string }>(EVENTS.CARD_REMOVE, ({ id }) => {
-  cart.remove(id);
-  const isBasketOpen = !!document.querySelector(".modal.modal_active .basket");
-  if (!isBasketOpen) {
-    modal.close();
+events.on<{ id: string; from?: "preview" | "basket" }>(
+  EVENTS.CARD_REMOVE,
+  ({ id, from }) => {
+    cart.remove(id);
+    if (from === "preview") {
+      modal.close();
+    }
   }
+);
+
+events.on(EVENTS.ORDER_ADDRESS_PAYMENT_NEXT, () => {
+  if (isAddressPaymentValid()) openOrderEmailPhone();
 });
 
-events.on(EVENTS.ORDER_STEP1_NEXT, () => {
-  if (isStep1Valid()) openOrderStep2();
-});
-
-events.on(EVENTS.ORDER_STEP2_PAY, () => handlePay());
+events.on(EVENTS.ORDER_EMAIL_PHONE_PAY, () => handlePay());
 
 (async () => {
   try {

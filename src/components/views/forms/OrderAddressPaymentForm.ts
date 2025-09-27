@@ -1,8 +1,11 @@
 import { BaseForm } from "./BaseForm";
 import { ensureElement } from "../../../utils/utils";
 
-export type TOrderStep1 = { address: string; payment: "card" | "cash" | "" };
-export class OrderStep1Form extends BaseForm<TOrderStep1> {
+export type TOrderAddressPayment = {
+  address: string;
+  payment: "card" | "cash" | "";
+};
+export class OrderAddressPaymentForm extends BaseForm<TOrderAddressPayment> {
   protected addressInput: HTMLInputElement;
   protected cardButton: HTMLButtonElement;
   protected cashButton: HTMLButtonElement;
@@ -10,7 +13,7 @@ export class OrderStep1Form extends BaseForm<TOrderStep1> {
   constructor(
     container: HTMLElement,
     onSubmit: () => void,
-    onChange: (data: Partial<TOrderStep1>) => void
+    onChange: (data: Partial<TOrderAddressPayment>) => void
   ) {
     super(container, onSubmit);
     this.addressInput = ensureElement<HTMLInputElement>(

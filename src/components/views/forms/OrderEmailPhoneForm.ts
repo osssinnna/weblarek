@@ -1,15 +1,15 @@
 import { BaseForm } from "./BaseForm";
 import { ensureElement } from "../../../utils/utils";
 
-export type TOrderStep2 = { email: string; phone: string };
-export class OrderStep2Form extends BaseForm<TOrderStep2> {
+export type TOrderEmailPhone = { email: string; phone: string };
+export class OrderEmailPhoneForm extends BaseForm<TOrderEmailPhone> {
   protected emailInput: HTMLInputElement;
   protected phoneInput: HTMLInputElement;
 
   constructor(
     container: HTMLElement,
     onSubmit: () => void,
-    onChange: (data: Partial<TOrderStep2>) => void
+    onChange: (data: Partial<TOrderEmailPhone>) => void
   ) {
     super(container, onSubmit);
     this.emailInput = ensureElement<HTMLInputElement>(
