@@ -1,97 +1,243 @@
 import "./scss/styles.scss";
-import { apiProducts } from "./utils/data";
+
+import { cloneTemplate, ensureElement } from "./utils/utils";
+import { API_URL } from "./utils/constants";
+
+import { WebLarekApi } from "./components/WebLarekApi";
+
+import { EventEmitter, IEvents } from "./components/base/Events";
+import { EVENTS } from "./components/base/eventNames";
+
 import { ProductsModel } from "./components/models/ProductsModel";
 import { CartModel } from "./components/models/CartModel";
 import { BuyerModel } from "./components/models/BuyerModel";
-import { API_URL } from "./utils/constants";
-import { WebLarekApi } from "./components/WebLarekApi";
+import { Header } from "./components/views/Header";
+import { Gallery } from "./components/views/Gallery";
+import { CardCatalog } from "./components/views/CardCatalog";
+import { CardPreview } from "./components/views/CardPreview";
+import { CardInCart } from "./components/views/CardInCart";
+import { BasketView } from "./components/views/BasketView";
+import { Modal } from "./components/views/Modal";
+import { OrderStep1Form } from "./components/views/forms/OrderStep1Form";
+import { OrderStep2Form } from "./components/views/forms/OrderStep2Form";
+import { OrderSuccess } from "./components/views/OrderSuccess";
 
-const webLarekApi = new WebLarekApi(API_URL);
-const productsModel = new ProductsModel();
+import type { IProduct, IOrderPayload } from "./types";
 
-//Проверка для каталога
+const events: IEvents = new EventEmitter();
+const api = new WebLarekApi(API_URL);
+const products = new ProductsModel(events);
+const cart = new CartModel(events);
+const buyer = new BuyerModel(events);
 
-productsModel.setItems(apiProducts.items);
+const header = new Header(events, ensureElement<HTMLElement>(".header"));
+const gallery = new Gallery(ensureElement<HTMLElement>("main.gallery"));
+const modal = new Modal(ensureElement<HTMLElement>(".modal"));
 
-console.log("Каталог — всего:", productsModel.getItems().length);
-console.log("Каталог — первый товар:", productsModel.getItems()[0]);
+const tplCardCatalog = ensureElement<HTMLTemplateElement>("#card-catalog");
+const tplCardPreview = ensureElement<HTMLTemplateElement>("#card-preview");
+const tplBasket = ensureElement<HTMLTemplateElement>("#basket");
+const tplBasketItem = ensureElement<HTMLTemplateElement>("#card-basket");
+const tplOrderStep1 = ensureElement<HTMLTemplateElement>("#order");
+const tplOrderStep2 = ensureElement<HTMLTemplateElement>("#contacts");
+const tplSuccess = ensureElement<HTMLTemplateElement>("#success");
 
-const firstId = productsModel.getItems()[0]?.id;
-productsModel.setSelectedProduct(firstId ?? null);
-console.log("Выбранный товар:", productsModel.getSelectedProduct());
+const rerenderHeader = () => header.render({ counter: cart.getCount() });
 
-//Проверка для корзины
+const rerenderCatalog = () => {
+  const items: HTMLElement[] = products.getItems().map((item: IProduct) => {
+    const card = new CardCatalog(cloneTemplate(tplCardCatalog), {
+      onClick: () => events.emit(EVENTS.CARD_SELECT, { id: item.id }),
+    });
+    return card.render({
+      title: item.title,
+      price: item.price,
+      image: item.image,
+      category: item.category,
+    });
+  });
 
-const cartModel = new CartModel();
+  gallery.render({ catalog: items });
+};
 
-const firstPaidProduct = productsModel
-  .getItems()
-  .find((p) => typeof p.price === "number");
+function openPreview() {
+  const item = products.getSelectedProduct();
+  if (!item) return;
 
-if (firstPaidProduct) {
-  cartModel.add(firstPaidProduct);
+  const view = new CardPreview(cloneTemplate(tplCardPreview), {
+    onBuy: () => events.emit(EVENTS.CARD_BUY, { id: item.id }),
+    onRemove: () => events.emit(EVENTS.CARD_REMOVE, { id: item.id }),
+  });
+
+  modal.open(
+    view.render({
+      title: item.title,
+      price: item.price,
+      image: item.image,
+      description: item.description,
+      inCart: cart.has(item.id),
+    })
+  );
 }
 
-console.log("Корзина — список:", cartModel.getItems());
-console.log("Корзина — кол-во:", cartModel.getCount());
-console.log("Корзина — сумма:", cartModel.getTotal());
+function openBasket() {
+  const rows: HTMLElement[] = cart.getItems().map((p, idx) => {
+    const row = new CardInCart(cloneTemplate(tplBasketItem), {
+      onRemove: () => events.emit(EVENTS.CARD_REMOVE, { id: p.id }),
+    });
+    return row.render({
+      index: idx + 1,
+      title: p.title,
+      price: p.price,
+    });
+  });
 
-if (firstPaidProduct) {
-  cartModel.remove(firstPaidProduct.id);
+  const basket = new BasketView(cloneTemplate(tplBasket), () =>
+    events.emit(EVENTS.BASKET_CHECKOUT)
+  );
+
+  modal.open(
+    basket.render({
+      items: rows,
+      total: cart.getTotal(),
+      empty: rows.length === 0,
+    })
+  );
 }
-console.log(
-  "Корзина — после удаления:",
-  cartModel.getItems(),
-  "кол-во:",
-  cartModel.getCount()
-);
 
-//Проверка для покупателя
+function openOrderStep1() {
+  const form = new OrderStep1Form(
+    cloneTemplate(tplOrderStep1),
+    () => events.emit(EVENTS.ORDER_STEP1_NEXT),
+    (data) => {
+      if ("address" in data) buyer.setAddress(data.address || "");
+      if ("payment" in data) buyer.setPayment((data.payment || "") as any);
+      updateStep1Validity(form);
+    }
+  );
 
-const buyer = new BuyerModel();
+  form.render({
+    address: buyer.getAddress() || "",
+    payment: (buyer.getPayment() || "") as any,
+    valid: isStep1Valid(),
+    errors: {},
+  });
 
-const logErrors = (label: string, obj: object) =>
-  console.log(label, Object.keys(obj).length ? obj : "нет ошибок");
+  modal.open(form.render());
+}
 
-console.log("Buyer — начальные данные:", buyer.get());
-logErrors("Step1 (payment,address):", buyer.validateStep1());
-logErrors("Step2 (email,phone):", buyer.validateStep2());
+function openOrderStep2() {
+  const form = new OrderStep2Form(
+    cloneTemplate(tplOrderStep2),
+    () => events.emit(EVENTS.ORDER_STEP2_PAY),
+    (data) => {
+      if ("email" in data) buyer.setEmail(data.email || "");
+      if ("phone" in data) buyer.setPhone(data.phone || "");
+      updateStep2Validity(form);
+    }
+  );
 
-buyer.setPayment("card");
-console.log("Buyer — после setPayment:", buyer.get());
-logErrors("Step1 (address):", buyer.validateStep1());
+  form.render({
+    email: buyer.getEmail() || "",
+    phone: buyer.getPhone() || "",
+    valid: isStep2Valid(),
+    errors: {},
+  });
 
-buyer.setAddress("г. Москва, пр-т Мира, 1");
-console.log("Buyer — после setAddress:", buyer.get());
-logErrors("Step1 (нет ошибок):", buyer.validateStep1());
+  modal.open(form.render());
+}
 
-logErrors("Step2 (email,phone):", buyer.validateStep2());
+function handlePay() {
+  if (!isStep2Valid()) return;
 
-buyer.setEmail("user@example.com");
-console.log("Buyer — после setEmail:", buyer.get());
-logErrors("Step2 (phone):", buyer.validateStep2());
+  const payload: IOrderPayload = {
+    items: cart.getItems().map((i) => i.id),
+    payment: buyer.getPayment() || "",
+    address: buyer.getAddress() || "",
+    email: buyer.getEmail() || "",
+    phone: buyer.getPhone() || "",
+    total: cart.getTotal(),
+  };
 
-buyer.setPhone("+7 999 000-00-00");
-console.log("Buyer — после setPhone:", buyer.get());
-logErrors("Step2 (нет ошибок):", buyer.validateStep2());
+  api
+    .postOrder(payload)
+    .then((res) => {
+      cart.clear();
+      buyer.reset();
 
-buyer.setAddress("   ");
-logErrors("Step1 (некорректные значения):", buyer.validateStep1());
+      const view = new OrderSuccess(cloneTemplate(tplSuccess), () =>
+        modal.close()
+      );
 
-buyer.clear();
-console.log("Buyer — после clear():", buyer.get());
-logErrors("Step1 (payment,address):", buyer.validateStep1());
-logErrors("Step2 (email,phone):", buyer.validateStep2());
+      modal.open(view.render({ total: res.total }));
+    })
+    .catch((e) => {
+      console.error("Ошибка оформления заказа:", e);
+    });
+}
 
-//Проверка свзяи с апи
+//валидация
+
+const isStep1Valid = () => Object.keys(buyer.validateStep1()).length === 0;
+const isStep2Valid = () => Object.keys(buyer.validateStep2()).length === 0;
+
+function updateStep1Validity(form: OrderStep1Form) {
+  form.render({ valid: isStep1Valid(), errors: buyer.validateStep1() });
+}
+
+function updateStep2Validity(form: OrderStep2Form) {
+  form.render({ valid: isStep2Valid(), errors: buyer.validateStep2() });
+}
+
+// modal
+
+events.on(EVENTS.CATALOG_CHANGED, () => rerenderCatalog());
+events.on(EVENTS.CART_CHANGED, () => {
+  rerenderHeader();
+  const isBasketOpenNow = !!document.querySelector(
+    ".modal.modal_active .basket"
+  );
+  if (isBasketOpenNow) openBasket();
+});
+
+events.on(EVENTS.SELECT_CHANGED, () => openPreview());
+
+// view
+events.on(EVENTS.BASKET_OPEN, () => openBasket());
+events.on(EVENTS.BASKET_CHECKOUT, () => openOrderStep1());
+
+events.on<{ id: string }>(EVENTS.CARD_SELECT, ({ id }) => {
+  products.setSelectedProduct(id);
+});
+
+events.on<{ id: string }>(EVENTS.CARD_BUY, ({ id }) => {
+  const item = products.getItemById(id);
+  if (item) {
+    cart.add(item);
+    modal.close();
+  }
+});
+
+events.on<{ id: string }>(EVENTS.CARD_REMOVE, ({ id }) => {
+  cart.remove(id);
+  const isBasketOpen = !!document.querySelector(".modal.modal_active .basket");
+  if (!isBasketOpen) {
+    modal.close();
+  }
+});
+
+events.on(EVENTS.ORDER_STEP1_NEXT, () => {
+  if (isStep1Valid()) openOrderStep2();
+});
+
+events.on(EVENTS.ORDER_STEP2_PAY, () => handlePay());
 
 (async () => {
   try {
-    const items = await webLarekApi.getProducts();
-    productsModel.setItems(items);
-    console.log("Каталог (с сервера):", productsModel.getItems());
-    console.log("Всего товаров:", productsModel.getItems().length);
-  } catch (error) {
-    console.error("Ошибка загрузки каталога:", error);
+    const items = await api.getProducts();
+    products.setItems(items);
+    rerenderHeader();
+  } catch (e) {
+    console.error("Не удалось загрузить каталог:", e);
   }
 })();

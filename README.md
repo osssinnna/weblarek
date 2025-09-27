@@ -267,3 +267,184 @@ export interface IOrderResult {
 
 - `GET /product/` → `IProductsResponse`
 - `POST /order/` + body `IOrderPayload` → `IOrderResult`
+
+## Слой Представления (View)
+
+> Каждый класс представления отвечает за свой блок разметки, находит элементы **в конструкторе** и сохраняет ссылки в полях.  
+> Слушатели вешаются один раз. Представления **не содержат бизнес-логики** и **не хранят данные**.
+
+### Базовый класс: `Component<T>`
+
+- **Назначение:** общий базовый класс для всех компонентов UI.
+- **Конструктор:** `constructor(container: HTMLElement)`
+- **Поля:**
+  - `protected container: HTMLElement`
+- **Методы:**
+  - `render(data?: Partial<T>): HTMLElement` — применяет входные данные через сеттеры и возвращает `container`.
+
+---
+
+### Модальное окно: `Modal`
+
+> Модальное окно **не имеет дочерних классов**. Внутри отображаются самостоятельные компоненты.
+
+- **Конструктор:** `constructor(container: HTMLElement)`
+- **Поля:**
+  - `protected closeButton: HTMLButtonElement` — `.modal__close`
+  - `protected contentElement: HTMLElement` — `.modal__content`
+- **Методы:**
+  - `open(content?: HTMLElement): void` — вставляет контент и добавляет модификатор `modal_active` элементу `.modal`. Блокирует скролл страницы.
+  - `close(): void` — снимает `modal_active`. Возвращает скролл страницы.
+  - `set content(value: HTMLElement | null)` — замена содержимого `.modal__content`.
+
+---
+
+### Шапка: `Header`
+
+- **Конструктор:** `constructor(events: IEvents, container: HTMLElement)`
+- **Поля:**
+  - `protected basketButton: HTMLButtonElement` — `.header__basket`
+  - `protected counterElement: HTMLElement` — `.header__basket-counter`
+- **Методы:**
+  - `render(data: { counter: number }): HTMLElement` — обновляет счётчик.
+- **События (emit):**
+  - `basket:open` — при клике по иконке корзины.
+
+---
+
+### Галерея каталога: `Gallery`
+
+- **Конструктор:** `constructor(container: HTMLElement)`
+- **Поля:**
+  - `protected catalogElement: HTMLElement` — равен самому контейнеру `.gallery`.
+- **Методы:**
+  - `render(data: { catalog: HTMLElement[] }): HTMLElement` — заменяет детей контейнера; каждому элементу гарантируется класс `.gallery__item`.
+
+---
+
+### Базовая карточка: `Card<T extends object = {}>`
+
+(родитель для карточек каталога/превью/корзины)
+
+- **Конструктор:** `constructor(container: HTMLElement, actions?: { onClick?: () => void; onBuy?: () => void; onRemove?: () => void })`
+- **Поля:**
+  - `protected titleElement: HTMLElement` — `.card__title`
+  - `protected priceElement: HTMLElement` — `.card__price`
+- **Методы/сеттеры:**
+  - `set title(value: string)` — текст заголовка.
+  - `set price(value: number | null)` — цена или «Бесценно».
+- **Особенность:** клик по **внутренней** кнопке не триггерит `onClick` карточки.
+
+---
+
+### Карточка в каталоге: `CardCatalog extends Card`
+
+- **Конструктор:** `constructor(container: HTMLElement, actions?: { onClick?: () => void })`
+- **Поля:**
+  - `protected imageElement: HTMLImageElement` — `.card__image`
+  - `protected categoryElement: HTMLElement` — `.card__category`
+- **Методы/сеттеры:**
+  - `render(data: { title: string; price: number | null; image: string; category: string }): HTMLElement`
+  - применяет модификаторы элемента `.card__category` по `categoryMap` (см. `src/utils/constants.ts`).
+
+---
+
+### Карточка превью (в модалке): `CardPreview extends Card`
+
+- **Конструктор:** `constructor(container: HTMLElement, actions?: { onBuy?: () => void; onRemove?: () => void })`
+- **Поля:**
+  - `protected imageElement: HTMLImageElement` — `.card__image`
+  - `protected textElement: HTMLElement` — `.card__text`
+  - `protected actionButton: HTMLButtonElement` — `.card__button`
+- **Методы/сеттеры:**
+  - `render(data: { title: string; price: number | null; image: string; description: string; inCart: boolean }): HTMLElement`
+  - если `price === null` — `actionButton.disabled = true`, текст «Недоступно»; иначе текст «Купить»/«Удалить из корзины» по `inCart`.
+
+---
+
+### Карточка в корзине (строка): `CardInCart extends Card`
+
+- **Конструктор:** `constructor(container: HTMLElement, actions?: { onRemove?: () => void })`
+- **Поля:**
+  - `protected indexElement: HTMLElement` — `.basket__item-index`
+  - `protected removeButton: HTMLButtonElement` — `.basket__item-delete`
+- **Методы/сеттеры:**
+  - `render(data: { index: number; title: string; price: number | null }): HTMLElement`
+
+---
+
+### Корзина(модальное окно): `BasketView`
+
+- **Конструктор:** `constructor(container: HTMLElement, onCheckout: () => void)`
+- **Поля:**
+  - `protected listElement: HTMLElement` — `.basket__list`
+  - `protected totalElement: HTMLElement` — `.basket__price`
+  - `protected checkoutButton: HTMLButtonElement` — `.basket__button`
+- **Методы/сеттеры:**
+  - `render(data: { items: HTMLElement[]; total: number; empty: boolean }): HTMLElement`
+  - при `empty = true` — выводит «Корзина пуста» и дизейблит кнопку оформления.
+- **События (emit через коллбэк):**
+  - `basket:checkout` — при клике по кнопке «Оформить».
+
+---
+
+### Базовая форма: `BaseForm<T extends object = {}>`
+
+- **Конструктор:**  
+  `constructor(container: HTMLFormElement, onSubmit: () => void, onChange?: (data: Partial<T>) => void)`
+- **Поля:**
+  - `protected submitButton: HTMLButtonElement` — `button[type="submit"]`
+  - `protected errorsElement: HTMLElement` — `.form__errors`
+- **Методы/сеттеры:**
+  - `render(data: Partial<T & { valid?: boolean; errors?: Record<string,string> }>): HTMLElement`
+  - `set valid(value: boolean)` — включает/выключает кнопку submit.
+  - `set errors(map: Record<string,string>)` — выводит агрегированное сообщение об ошибках.
+
+---
+
+### Первая форма обработки ошибок: `OrderStep1Form extends BaseForm<{ payment: 'card'|'cash'|''; address: string }>`
+
+- **Конструктор:**  
+  `constructor(container: HTMLFormElement, onSubmit: () => void, onChange: (data: Partial<{ payment: 'card'|'cash'|''; address: string }>) => void)`
+- **Поля:**
+  - кнопки выбора оплаты — `.button_alt` (активная помечается модификатором `button_alt-active`)
+  - поле адреса — `input[name="address"]`
+- **Методы/сеттеры:**
+  - `render(data: { payment: 'card'|'cash'|''; address: string; valid: boolean; errors: Record<string,string> }): HTMLElement`
+
+---
+
+### Вторая форма обработки ошибок: `OrderStep2Form extends BaseForm<{ email: string; phone: string }>`
+
+- **Конструктор:**  
+  `constructor(container: HTMLFormElement, onSubmit: () => void, onChange: (data: Partial<{ email: string; phone: string }>) => void)`
+- **Поля:**
+  - поле email — `input[name="email"]`
+  - поле phone — `input[name="phone"]`
+- **Методы/сеттеры:**
+  - `render(data: { email: string; phone: string; valid: boolean; errors: Record<string,string> }): HTMLElement`
+
+---
+
+### Модалбное окно «Заказ оформлен»: `OrderSuccess`
+
+- **Конструктор:** `constructor(container: HTMLElement, onClose: () => void)`
+- **Поля:**
+  - `protected descriptionElement: HTMLElement` — `.order-success__description`
+  - `protected closeButton: HTMLButtonElement` — `.order-success__close`
+- **Методы/сеттеры:**
+  - `render(data: { total: number }): HTMLElement` — выставляет текст «Списано N синапсов».
+
+---
+
+## События, генерируемые Представлениями
+
+> Имена событий перечислены в `src/components/base/eventNames.ts`.
+
+- `basket:open` — клик по корзине в шапке (`Header`)
+- `card:select` — выбор карточки в каталоге (`CardCatalog`)
+- `card:buy` — клик «Купить» в превью (`CardPreview`)
+- `card:remove` — клик «Удалить из корзины» в превью или в строке корзины (`CardPreview`, `CardInCart`)
+- `basket:checkout` — клик «Оформить» в корзине (`BasketView`)
+- `order:step1:next` — сабмит формы шага 1 (`OrderStep1Form`)
+- `order:step2:pay` — сабмит формы шага 2 (`OrderStep2Form`)

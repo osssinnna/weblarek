@@ -1,14 +1,9 @@
 import type { TPayment } from "../../types";
+import type { IEvents } from "../base/Events";
+import { EVENTS } from "../base/eventNames";
 
-type Step1Errors = {
-  payment?: string;
-  address?: string;
-};
-
-type Step2Errors = {
-  email?: string;
-  phone?: string;
-};
+type Step1Errors = { payment?: string; address?: string };
+type Step2Errors = { email?: string; phone?: string };
 
 export class BuyerModel {
   private payment?: TPayment;
@@ -16,58 +11,60 @@ export class BuyerModel {
   private email?: string;
   private phone?: string;
 
-  public setPayment(value: TPayment) {
-    this.payment = value;
+  constructor(private events?: IEvents) {}
+
+  public setPayment(payment: TPayment) {
+    this.payment = payment;
+    this.events?.emit(EVENTS.BUYER_CHANGED, {});
+  }
+  public getPayment(): TPayment | undefined {
+    return this.payment;
   }
 
-  public setAddress(value: string) {
-    this.address = value;
+  public setAddress(address: string) {
+    this.address = address;
+    this.events?.emit(EVENTS.BUYER_CHANGED, {});
+  }
+  public getAddress(): string | undefined {
+    return this.address;
   }
 
-  public setEmail(value: string) {
-    this.email = value;
+  public setEmail(email: string) {
+    this.email = email;
+    this.events?.emit(EVENTS.BUYER_CHANGED, {});
+  }
+  public getEmail(): string | undefined {
+    return this.email;
   }
 
-  public setPhone(value: string) {
-    this.phone = value;
+  public setPhone(phone: string) {
+    this.phone = phone;
+    this.events?.emit(EVENTS.BUYER_CHANGED, {});
+  }
+  public getPhone(): string | undefined {
+    return this.phone;
   }
 
-  public get() {
-    return {
-      payment: this.payment,
-      address: this.address,
-      email: this.email,
-      phone: this.phone,
-    };
-  }
-
-  public clear() {
-    this.payment = undefined;
-    this.address = undefined;
-    this.email = undefined;
-    this.phone = undefined;
+  public reset() {
+    this.payment = "";
+    this.address = "";
+    this.email = "";
+    this.phone = "";
+    this.events?.emit(EVENTS.BUYER_CHANGED, {});
   }
 
   public validateStep1(): Step1Errors {
     const errors: Step1Errors = {};
-    if (this.payment != "card" && this.payment != "cash") {
-      errors.payment = "Способ оплаты не выбран";
-    }
-    if (!this.address || !this.address.trim()) {
-      errors.address = "Укажите адрес доставки";
-    }
-
+    if (!this.payment) errors.payment = "Выберите способ оплаты";
+    if (!this.address || !this.address.trim())
+      errors.address = "Необходимо указать адрес";
     return errors;
   }
 
   public validateStep2(): Step2Errors {
     const errors: Step2Errors = {};
-    if (!this.email || !this.email.trim()) {
-      errors.email = "Укажите email";
-    }
-    if (!this.phone || !this.phone.trim()) {
-      errors.phone = "Укажите телефон";
-    }
+    if (!this.email || !this.email.trim()) errors.email = "Укажите email";
+    if (!this.phone || !this.phone.trim()) errors.phone = "Укажите телефон";
     return errors;
   }
 }

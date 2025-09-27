@@ -1,7 +1,9 @@
 import type { IProduct } from "../../types";
-
+import type { IEvents } from "../base/Events";
+import { EVENTS } from "../base/eventNames";
 export class CartModel {
   private items: Map<string, IProduct> = new Map();
+  constructor(private events?: IEvents) {}
 
   public getItems(): IProduct[] {
     //получить товары из корзины
@@ -12,15 +14,19 @@ export class CartModel {
     if (!product?.id) return;
     if (product.price === null) return;
     this.items.set(product.id, product);
+    this.events?.emit(EVENTS.CART_CHANGED, {});
   }
 
-  public remove(productOrId: IProduct | string) {
-    const id = typeof productOrId === "string" ? productOrId : productOrId?.id;
-    if (id) this.items.delete(id);
+  public remove(id: string) {
+    this.items.delete(id);
+    this.events?.emit(EVENTS.CART_CHANGED, {});
   }
 
   public clear() {
-    this.items.clear();
+    if (this.items.size) {
+      this.items.clear();
+      this.events?.emit(EVENTS.CART_CHANGED, {});
+    }
   }
 
   public getCount(): number {
