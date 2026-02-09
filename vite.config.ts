@@ -4,13 +4,10 @@ export default defineConfig({
   base: "/weblarek/",
   build: {
     outDir: "dist",
-    assetsDir: "assets",
+    sourcemap: false,
     rollupOptions: {
-      input: "index.html",
-      output: {
-        assetFileNames: "assets/[name][extname]",
-        chunkFileNames: "assets/[name].[hash].js",
-        entryFileNames: "assets/[name].[hash].js",
+      input: {
+        main: "./index.html",
       },
     },
   },
