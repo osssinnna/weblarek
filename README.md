@@ -17,6 +17,10 @@
 - src/utils/constants.ts — файл с константами
 - src/utils/utils.ts — файл с утилитами
 
+## Деплой
+
+https://osssinnna.github.io/weblarek/
+
 ## Установка и запуск
 
 Для установки и запуска проекта необходимо выполнить команды
